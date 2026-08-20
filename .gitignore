@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# ML experiments
+checkpoints/
+outputs/
+runs/
+wandb/
+logs/
+
+# Local data
+/data/
+/datasets/
+/prepared/
+/runs/
+/checkpoints/
+*.bin
