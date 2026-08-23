@@ -1,0 +1,40 @@
+[project]
+name = "tiny-dlm"
+version = "0.1.0"
+description = "A toy masked diffusion LM"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.5",
+    "einops>=0.8",
+    "regex>=2024.5.15",      # \p{L} pretokenization pattern; stdlib `re` cannot do it
+    "numpy>=2.0",            # uint16 token bins + np.memmap batching
+    "tqdm>=4.66",            # progress for the two slow steps: fetching and BPE training
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.9", "imageio>=2.35"]
+
+[dependency-groups]
+dev = ["ruff>=0.6", "pytest>=8.3"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Only the core ships. `lab/` and `tests/` are repo-local, run from the repo root.
+packages = ["src/tinydlm"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "."]
+# Ruff formats Python blocks inside Markdown, which is what we want for README/STYLE.
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # so tests can import the unpackaged `lab`
+addopts = "-q"
