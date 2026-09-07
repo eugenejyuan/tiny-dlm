@@ -1,35 +1,20 @@
-"""Axis legend, the same letters as everywhere else in this package:
+"""Bidirectional Transformer denoiser, with no causal mask or timestep input.
 
-    B    batch                 T    query position    S    key position (always == T)
-    V    vocabulary            D    model width       H    heads
-    Dh   head dim, D = H * Dh  Dff  MLP hidden width  Dh2  half a head dim, Dh / 2
-
-The architecture:
-
-    no causal mask     masks appear anywhere in the sequence, so every position has to 
-                       attend to every position
-    no timestep input  the mask pattern estimates t; explicit time conditioning had minimal 
-                       effect in its OpenWebText ablation (Sahoo et al. 2024 Appendix E.5)
-    RMSNorm, no gain   one scale-free normalization with no extra learned vector
-    RoPE               position as a rotation, so attention reads the distance t - s
-    QK-norm            bounds attention scores before the softmax
-    ReLU^2 MLP         a two-matrix gated-power activation (So et al. 2021)
-    tied embedding     input and output index the same V x D space, and untying it would
-                       add a fifth of the parameters at depth 6
-
+The reference uses RoPE, gain-free RMSNorm, QK normalization, squared ReLU, and tied embeddings.
+Tensor axes are defined in STYLE.md.
 """
 
 import math
 
 import torch
-from torch import Tensor, nn
 from einops import einsum, rearrange
+from torch import Tensor, nn
 
 from tinydlm.config import Config
 
 NORM_EPS = 1e-6  # the floor under RMSNorm, so an all-zero row cannot divide by zero
 ROPE_BASE = 10_000.0
-MLP_RATIO = 4  # Dff = 4 * D, the project's fixed expansion ratio
+MLP_RATIO = 4  # Dff = 4 * D for this reference architecture
 
 
 def rms_norm(x: Tensor) -> Tensor:
@@ -64,10 +49,10 @@ class RoPE(nn.Module):
 
 
 class Attention(nn.Module):
-    """Bidirectional attention. The entire difference from GPT is the missing causal mask.
+    """Full self-attention lets masked positions use both left and right context.
 
-    The score matrix is materialized instead of disappearing into F.scaled_dot_product_attention, 
-    so the reader can see that every position attends to every position. 
+    Materializing the score matrix exposes the attention pattern. Fused attention is a possible
+    performance experiment; it should preserve this reference's bidirectional semantics.
     """
 
     def __init__(self, cfg: Config) -> None:
@@ -85,7 +70,7 @@ class Attention(nn.Module):
         q, k = rope(rms_norm(q)), rope(rms_norm(k))  # QK-norm then RoPE, both shape-preserving
 
         score = einsum(q, k, "B T H Dh, B S H Dh -> B H T S") / math.sqrt(q.shape[-1])
-        attn = score.softmax(dim=-1)  # no mask: this is the whole architectural claim
+        attn = score.softmax(dim=-1)  # no causal mask: both sides provide denoising context
         o = einsum(attn, v, "B H T S, B S H Dh -> B T H Dh")
         return self.out_proj(rearrange(o, "B T H Dh -> B T (H Dh)"))
 

@@ -1,34 +1,21 @@
 # Style
 
-This is the quick reference for writing core code. Broader design principles live in
-[the project mission](specs/mission.md).
+Use clear ASCII English for source and comments; data fixtures may contain Unicode.
+Experiment notes may use English or Chinese. Scope and file placement live in
+[the mission](specs/mission.md).
 
-## Tensor axes
-
-Core modules share this vocabulary:
+## Tensor notation
 
 ```text
-B    batch
-T    query position
-S    key position, always equal to T
-V    vocabulary
-D    model width
-H    heads
-Dh   head dimension, D = H * Dh
-Dff  MLP hidden width
-Dh2  half a head dimension, Dh / 2
-K    positions revealed in one denoising step, K <= T
+B    batch                  T    query position       S    key position
+V    vocabulary             D    model width          H    heads
+Dh   head dimension         Dff  MLP hidden width     Dh2  half a head dimension
+K    positions revealed per denoising step
 ```
 
-Attention keeps `T` and `S` separate because query and key positions have different roles even
-when their lengths are equal. Add any new axis here before using it in core code.
-
-## Shape annotations
-
-Tensor names describe meaning, not shape. Annotate a shape only where axes are introduced or
-rearranged, broadcasting is easy to miss, or the shape explains the algorithm.
-
-Use an `einops` pattern when axes define the operation:
+In the current model, S = T and D = H * Dh. Define any additional axes where introduced.
+Tensor names describe meaning. Annotate shapes at rearrangements, broadcasts, or other
+non-obvious transitions; skip routine shape-preserving operations. Prefer einops:
 
 ```python
 score = einsum(q, k, "B T H Dh, B S H Dh -> B H T S")
@@ -40,14 +27,12 @@ Use a concise trailing comment when no pattern string carries the shape:
 t = torch.rand(B, 1, device=x.device)  # (B, 1): one noise level per sequence
 ```
 
-Do not annotate routine shape-preserving operations or obvious plumbing.
+Native operations are fine when they make the code clearer or serve a measured optimization.
 
-## Repository rules
+## Comments and checks
 
-- All tensor rearrangement in `src/tinydlm/` goes through `einops.rearrange` or
-  `einops.einsum`; do not use `.view`, `.transpose`, or `.permute`.
-- Keep feature flags out of the core path. Experimental variants belong in `lab/`.
-- Comments and docstrings explain rationale or math, not a second version of the code.
-- Everything under `src/`, `lab/`, and `tests/` uses ASCII English.
+Explain equations, assumptions, and failure modes; do not narrate obvious code or repeat
+project policy in modules. Keep each explanation in one place and avoid speculative extensions.
 
-Run `just lint` to check the enforceable rules.
+After setup, inspect style with `uv run ruff check src` and `uv run ruff format --check src`.
+These do not check mathematical correctness.
